@@ -38,10 +38,11 @@ O uso correto de Queue ou Events Group dará aos alunos uma bonificação na mé
 
 ## Projeto
 
-+ Três threads serão criadas para realizar a contagem nas três esteiras.
++ Três threads serão criadas para realizar a contagem nas três esteiras. (vTaskDelayUntil)
 + Cada thread deverá receber um identificador para saber de que esteira é.
 + Cada thread deverá somar 1 na contagem total e inserir o peso do produto no vetor de pesos.
-+ Cada thread terá uma taxa de execução conforme definido no requisito funcional 1.
-+ O peso do produto na esteira deverá ser o definido no requisito funcional 1.
++ Cada thread terá uma taxa de execução conforme definido no requisito funcional 1. (vTaskDelayUntil)
++ O peso do produto na esteira deverá ser como foi definido no requisito funcional 1.
 + Será criado um mecanismo de proteção para a seção crítica.
++ Para realizar a soma dos pesos todas as outras threads deverão ser suspensas. (vTaskSuspend/vTaskResume)
 
