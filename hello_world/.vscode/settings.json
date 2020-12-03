@@ -9,6 +9,7 @@
   },
   "C_Cpp.intelliSenseEngineFallback": "Enabled",
   "files.associations": {
-    "freertos.h": "c"
+    "freertos.h": "c",
+    "random": "c"
   }
 }

@@ -1,9 +1,12 @@
 /*
-Arquivo: hello_word_and_blink_task.c
-Autor: Felipe Viel
-Função do arquivo: Cria uma task para printar o Hello World e uma para blink. Baseado no exempo do ESP-IDF
-Criado em 17 de novembro de 2020
-Modificado em 17 de novembro de 2020
+Arquivo: monitoramento_esteiras.c
+Autor:  Diogo Marchi
+        George Borba
+Função do arquivo: 
+        Cria threads para contagem, pesagem e exibição de
+        produtos em 3 esteiras.
+Criado em 02 de dezembro de 2020
+Modificado em 02 de dezembro de 2020
 
 */
 
@@ -14,55 +17,112 @@ Modificado em 17 de novembro de 2020
 #include "driver/gpio.h"
 #include "nvs_flash.h"
  
-#define BLINK_GPIO 2
- 
-static int num_produtos = 0;
-static int pesos[1500] = {0x0};
+ // periodo entre passagem de produtos nas esteiras 
+#define TEMPO_EST_1 1000
+#define TEMPO_EST_2 500
+#define TEMPO_EST_3 100
 
-void soma_pesos(void *pvParameter)
+// periodo entre atualizações do display
+#define TEMPO_ATUALIZACAO 2000
+
+// peso dos produtos nas esteiras
+#define PESO_EST_1 5.0
+#define PESO_EST_2 2.0
+#define PESO_EST_3 0.5
+
+
+static int num_produtos = 0;
+static float pesos[1500] = {0x0};
+
+void soma_pesos()
 {
-    while(1)
+    float peso_total = 0;
+    for(int i = 0; i < 1500; i++)
     {
-        // suspender ela mesmo e aguardar por resumir
-        // suspender as outras threads
-        // contar peso
-        // resumir sumir outras threads
+        peso_total += pesos[i];
     }
+
+    printf("O peso total dos prodos foi %f \n", peso_total);    
 }
 
-void esteira_x(void *pvParameter)
+void soma_produto(float peso)
 {
- 
+    // mutex
+    pesos[num_produtos] = peso;
+    num_produtos++;
+
+    if (num_produtos >= 1500)
+    {
+        soma_pesos(); 
+        num_produtos = 0;
+    }
+    // end mutex
+}
+
+void esteira_1(void *pvParameter)
+{    
+    TickType_t xLastWakeTime;
+
+    // tempo atual
+    xLastWakeTime = xTaskGetTickCount ();
+
 	while(1)
 	{
         // aguardar produto
+        vTaskDelayUntil(&xLastWakeTime, TEMPO_EST_1 / portTICK_RATE_MS);
 
-	    // região mutex
-        // somar produto
-        // verificar total < 1500
-            // resumir soma de peso
-            // se autosuspender
-        // fim mutex
-
-        if(num_produtos >= 1500) num_produtos = 0;
-        num_produtos++;
-	    vTaskDelay(1000 / portTICK_RATE_MS);
+	    // somar produto
+        soma_produto(PESO_EST_1);
 	}
 }
+
+void esteira_2(void *pvParameter)
+{
+    TickType_t xLastWakeTime;
+
+    // tempo atual
+    xLastWakeTime = xTaskGetTickCount ();
+
+    while(1)
+	{
+         // aguardar produto
+        vTaskDelayUntil(&xLastWakeTime, TEMPO_EST_2 / portTICK_RATE_MS);
+
+	    // somar produto
+        soma_produto(PESO_EST_2);
+	}
+}
+
+void esteira_3(void *pvParameter)
+{
+    TickType_t xLastWakeTime;
+
+    // tempo atual
+    xLastWakeTime = xTaskGetTickCount ();
+
+    while(1)
+	{
+         // aguardar produto
+        vTaskDelayUntil(&xLastWakeTime, TEMPO_EST_3 / portTICK_RATE_MS);
+
+	    // somar produto
+        soma_produto(PESO_EST_3);
+	}
+}
+
+
  
 void display(void *pvParameter)
 {
     
     TickType_t xLastWakeTime;
 
-    // Initialise the xLastWakeTime variable with the current time.
+    // tempo atual
     xLastWakeTime = xTaskGetTickCount ();
-
-    const TickType_t xTempo = 2000;
 
     while(1) 
     {
-        vTaskDelayUntil(&xLastWakeTime, xTempo / portTICK_RATE_MS);
+        vTaskDelayUntil(&xLastWakeTime, TEMPO_ATUALIZACAO / portTICK_RATE_MS);
         printf("Quantidade produtos %d\n", num_produtos);
     }
 }
@@ -70,10 +130,10 @@ void display(void *pvParameter)
  
 void app_main()
 {
-
     nvs_flash_init();
-    xTaskCreate(&esteira_x, "esteira_1", 2048, NULL, 5, NULL);
-    xTaskCreate(&esteira_x, "esteira_2", 2048, NULL, 5, NULL);
-    xTaskCreate(&esteira_x, "esteira_3", 2048, NULL, 5, NULL);
+
+    xTaskCreate(&esteira_1, "esteira_1", 2048, NULL, 5, NULL);
+    xTaskCreate(&esteira_2, "esteira_2", 2048, NULL, 5, NULL);
+    xTaskCreate(&esteira_3, "esteira_3", 2048, NULL, 5, NULL);
     xTaskCreate(&display, "display", 2048, NULL, 5, NULL);
 }
