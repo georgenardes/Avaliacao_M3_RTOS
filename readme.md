@@ -38,3 +38,10 @@ O uso correto de Queue ou Events Group dará aos alunos uma bonificação na mé
 
 ## Projeto
 
++ Três threads serão criadas para realizar a contagem nas três esteiras.
++ Cada thread deverá receber um identificador para saber de que esteira é.
++ Cada thread deverá somar 1 na contagem total e inserir o peso do produto no vetor de pesos.
++ Cada thread terá uma taxa de execução conforme definido no requisito funcional 1.
++ O peso do produto na esteira deverá ser o definido no requisito funcional 1.
++ Será criado um mecanismo de proteção para a seção crítica.
+
