@@ -2,16 +2,18 @@
 
 ## Requisitos
 
+### Não funcionais
 1. Usar FreeRTOS versão para ESP32
 1. Usar placa ESP32
 1. Usar ferramenta ESP-IDF (SDK-IDF)
 1. Usar biblioteca com funções de temporizador do próprio ESP32 para medir o tempo.
 1. Usar um mecanismo de proteção para a seção crítica.
 
+### Funcionais
 2. O sistema deve realizar uma simulação de detecção de produtos em 3 esteiras respeitando as seguintes restrições:
-  2. Esteira 1: A cada 1 segundo deve passar um produto de 5 Kg.
-  2. Esteira 2: A cada 0.5 segundo deve passar um produto de 2 Kg.
-  2. Esteira 3: A cada 0.1 segundo deve passar um produto de 0.5 Kg.
+   2. Esteira 1: A cada 1 segundo deve passar um produto de 5 Kg.
+   2. Esteira 2: A cada 0.5 segundo deve passar um produto de 2 Kg.
+   2. Esteira 3: A cada 0.1 segundo deve passar um produto de 0.5 Kg.
 2. O sistema deve possuir um display para exibir a contagem dos produtos.
 2. O sistema deve atualizar o display com o numero atual de produtos a cada 2 segundos.
 2. O sistema deve inserir o peso de cada produto em um vetor com 1500 posições.
