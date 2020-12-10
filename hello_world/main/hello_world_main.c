@@ -36,18 +36,24 @@ static float pesos[1500] = {0x0};
 
 void soma_pesos()
 {
+    // suspender as demais tasks
+    
     float peso_total = 0;
+    
+    // criar threads para realizar a soma paralelamente
     for(int i = 0; i < 1500; i++)
     {
         peso_total += pesos[i];
     }
 
     printf("O peso total dos prodos foi %f \n", peso_total);    
+
+    // retornar as demais tasks
 }
 
 void soma_produto(float peso)
 {
-    // mutex
+    // mutex (semaforo)
     pesos[num_produtos] = peso;
     num_produtos++;
 
@@ -136,4 +142,6 @@ void app_main()
     xTaskCreate(&esteira_2, "esteira_2", 2048, NULL, 5, NULL);
     xTaskCreate(&esteira_3, "esteira_3", 2048, NULL, 5, NULL);
     xTaskCreate(&display, "display", 2048, NULL, 5, NULL);
+    // criar task para monitoramento do botão de parada
+
 }
