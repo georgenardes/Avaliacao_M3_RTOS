@@ -17,6 +17,8 @@ Modificado em 02 de dezembro de 2020
 #include "esp_system.h"
 #include "driver/gpio.h"
 #include "nvs_flash.h"
+#include "driver/touch_pad.h"
+#include "esp_log.h"
 
 // NUM máximo de produto
 #define NUM_MAX_PROD 100
@@ -34,6 +36,12 @@ Modificado em 02 de dezembro de 2020
 #define PESO_EST_2 2.0
 #define PESO_EST_3 0.5
 
+// Valores do touch
+#define TOUCH_PAD_NO_CHANGE   (-1)
+#define TOUCH_THRESH_NO_USE   (0)
+#define TOUCH_FILTER_MODE_EN  (0)
+#define TOUCHPAD_FILTER_TOUCH_PERIOD (10)
+
 // variavel do semaforo
 SemaphoreHandle_t mutual_exclusion_mutex;
 
@@ -44,6 +52,7 @@ TaskHandle_t handler_display;
 TaskHandle_t handler_est1;
 TaskHandle_t handler_est2;
 TaskHandle_t handler_est3;
+TaskHandle_t handler_touch;
 
 static int num_produtos = 0;
 static float pesos[NUM_MAX_PROD] = {0x0};
@@ -168,6 +177,55 @@ void display(void *pvParameter)
     }
 }
  
+
+// configura o touch
+static void tp_example_touch_pad_init(void)
+{
+    for (int i = 0;i< TOUCH_PAD_MAX;i++) {
+        touch_pad_config(i, TOUCH_THRESH_NO_USE);
+    }
+}
+ 
+
+// função que le os valores dos pinos que acionam o touch
+static void tp_example_read_task(void *pvParameter)
+{
+    uint16_t touch_value;
+    uint16_t touch_filter_value;
+#if TOUCH_FILTER_MODE_EN
+    printf("Touch Sensor filter mode read, the output format is: \nTouchpad num:[raw data, filtered data]\n\n");
+#else
+    printf("Touch Sensor normal mode read, the output format is: \nTouchpad num:[raw data]\n\n");
+#endif
+    while (1) {
+
+#if TOUCH_FILTER_MODE_EN
+            // If open the filter mode, please use this API to get the touch pad count.
+            touch_pad_read_raw_data(i, &touch_value);
+            touch_pad_read_filtered(i, &touch_filter_value);
+            printf("T%d:[%4d,%4d] ", i, touch_value, touch_filter_value);
+#else
+            touch_pad_read(0, &touch_value);
+            if(touch_value < 1000){
+                printf("Desligando\n");
+                printf("Reinicie para começar o programa novamente\n");
+  
+                vTaskDelete(handler_est1);
+                vTaskDelete(handler_est2);
+                vTaskDelete(handler_est3);
+                vTaskDelete(handler_display);
+                vTaskDelete(handler_touch);
+            }
+#endif
+            if(touch_value < (uint16_t)100){
+                printf("\nSistema de Emergência Acinado");
+                vTaskDelay(2000/portTICK_PERIOD_MS);
+            }
+
+        printf("\n");
+        vTaskDelay(200 / portTICK_PERIOD_MS);
+    }
+} 
  
 void app_main()
 {
@@ -176,10 +234,24 @@ void app_main()
     // inicializa semáforo
     mutual_exclusion_mutex = xSemaphoreCreateMutex();
 
+    // Inicializa o touch
+    touch_pad_init();
+
     if( mutual_exclusion_mutex == NULL ){
         printf("Erro na criação do mutex\n");
         exit(0);
     }
+
+    // Configuração touch
+    touch_pad_set_voltage(TOUCH_HVOLT_2V7, TOUCH_LVOLT_0V5, TOUCH_HVOLT_ATTEN_1V);
+    tp_example_touch_pad_init();
+    #if TOUCH_FILTER_MODE_EN
+        touch_pad_filter_start(TOUCHPAD_FILTER_TOUCH_PERIOD);
+    #endif
+
+    // Start task to read values sensed by pads
+    xTaskCreate(&tp_example_read_task, "touch_pad_read_task", 2048, NULL, 3, &handler_touch);
+    configASSERT(handler_touch);
 
     xTaskCreate(&esteira_1, "esteira_1", 2048, NULL, 3, &handler_est1);
     configASSERT(handler_est1);
