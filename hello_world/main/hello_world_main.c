@@ -19,7 +19,7 @@ Modificado em 02 de dezembro de 2020
 #include "nvs_flash.h"
 
 // NUM máximo de produto
-#define NUM_MAX_PROD 1500
+#define NUM_MAX_PROD 100
 
  // periodo entre passagem de produtos nas esteiras 
 #define TEMPO_EST_1 1000
@@ -37,31 +37,52 @@ Modificado em 02 de dezembro de 2020
 // variavel do semaforo
 SemaphoreHandle_t mutual_exclusion_mutex;
 
-// handle de task para suspender
+// handler de task para suspender
 TaskHandle_t handler_display;
 
+// handler das esteiras 
+TaskHandle_t handler_est1;
+TaskHandle_t handler_est2;
+TaskHandle_t handler_est3;
+
 static int num_produtos = 0;
-static float pesos[1500] = {0x0};
+static float pesos[NUM_MAX_PROD] = {0x0};
+
+
+void suspender_tasks ()
+{
+    // display
+    vTaskSuspend(handler_display);
+    // inserir tasks para suspender aqui
+}
+
+void resumir_tasks ()
+{
+    // display
+    vTaskResume(handler_display);
+    // inserir tasks para suspender aqui
+}
+
 
 void soma_pesos()
 {
-    // suspender as demais tasks
-    vTaskSuspend(handler_display);
+    // suspender as  tasks
+    suspender_tasks();
 
     float peso_total = 0;
     
-    // criar threads para realizar a soma paralelamente
-    for(int i = 0; i < 1500; i++)
+    // TODO: criar threads para realizar a soma paralelamente
+    // dividir entre os dois cores 50% pra cada
+    // mutex nas tasks para poder somar corretamente
+    for(int i = 0; i < NUM_MAX_PROD; i++)
     {
         peso_total += pesos[i];
     }
 
-    printf("O peso total dos prodos foi %f \n", peso_total);    
+    printf("O peso total dos prodos foi %f \n", peso_total);        
 
-    vTaskDelay(10000 / portTICK_RATE_MS);
-
-    // retornar as demais tasks
-    vTaskResume(handler_display);
+    // resumir as tasks
+    resumir_tasks();
 	
 }
 
@@ -73,8 +94,9 @@ void soma_produto(float peso)
     pesos[num_produtos] = peso;
     num_produtos++;
 
-    if (num_produtos >= 1500)
+    if (num_produtos >= NUM_MAX_PROD)
     {
+        // cria task de somar peso
         soma_pesos(); 
         num_produtos = 0;
     }
@@ -139,14 +161,9 @@ void esteira_3(void *pvParameter)
 void display(void *pvParameter)
 {
     
-    TickType_t xLastWakeTime;
-
-    // tempo atual
-    xLastWakeTime = xTaskGetTickCount ();
-
     while(1) 
     {
-        vTaskDelayUntil(&xLastWakeTime, TEMPO_ATUALIZACAO / portTICK_RATE_MS);
+        vTaskDelay(TEMPO_ATUALIZACAO / portTICK_RATE_MS);
         printf("Quantidade produtos %d\n", num_produtos);
     }
 }
@@ -164,10 +181,19 @@ void app_main()
         exit(0);
     }
 
-    xTaskCreate(&esteira_1, "esteira_1", 2048, NULL, 5, NULL);
-    xTaskCreate(&esteira_2, "esteira_2", 2048, NULL, 5, NULL);
-    xTaskCreate(&esteira_3, "esteira_3", 2048, NULL, 5, NULL);
-    xTaskCreate(&display, "display", 2048, NULL, 5, &handler_display);
+    xTaskCreate(&esteira_1, "esteira_1", 2048, NULL, 3, &handler_est1);
+    configASSERT(handler_est1);
+
+    xTaskCreate(&esteira_2, "esteira_2", 2048, NULL, 3, &handler_est2);
+    configASSERT(handler_est2);
+
+    xTaskCreate(&esteira_3, "esteira_3", 2048, NULL, 3, &handler_est3);
+    configASSERT(handler_est2);
+    
+    xTaskCreate(&display, "display", 2048, NULL, 1, &handler_display);
+    configASSERT(handler_display);
+    
+
     // criar task para monitoramento do botão de parada
 
 }
