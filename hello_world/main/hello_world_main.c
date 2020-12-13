@@ -22,9 +22,9 @@ Modificado em 02 de dezembro de 2020
 #include "esp_timer.h"
 
 // NUM máximo de produto
-#define NUM_MAX_PROD 100
+#define NUM_MAX_PROD 1500
 
- // periodo entre passagem de produtos nas esteiras 
+// periodo milissegundos entre passagem de produtos nas esteiras 
 #define TEMPO_EST_1 1000
 #define TEMPO_EST_2 500
 #define TEMPO_EST_3 100
@@ -45,6 +45,7 @@ Modificado em 02 de dezembro de 2020
 
 // variavel do semaforo
 SemaphoreHandle_t mutual_exclusion_mutex;
+SemaphoreHandle_t mutual_exclusion_mutex_soma;
 
 // handler de task para suspender
 TaskHandle_t handler_display;
@@ -59,7 +60,7 @@ TaskHandle_t handler_task2;
 
 static int num_produtos = 0;
 static float pesos[NUM_MAX_PROD] = {0x0};
-float peso_total = 0;
+static float peso_total = 0;
 
 int64_t start_soma, end_soma;
 double total_time;
@@ -78,51 +79,73 @@ void resumir_tasks ()
     // inserir tasks para suspender aqui
 }
 
-void task1(int valor){
+void soma_paralela(int ID){
 
-    int max = 0, i = 0;
+    float resultado = 0;
+    int max = 0, i = 0; 
 
-    if(valor == 1){
-        i = 0;
-        max = 50;
-    }else{
-        i = 50;
-        max = 100;
-    }
-    for(int j = i; j < max; j ++ ){
+    while(1)
+    {
+        if (ID == 1)
+        {
+            i = 0;
+            max = (int) NUM_MAX_PROD/2;
+        } else if (ID == 2)
+        {
+            i = (int) NUM_MAX_PROD/2;
+            max = NUM_MAX_PROD;
+        } else 
+        {
+            printf("ID recebido errado!\n");
+            vTaskDelete(NULL);
+        }
+
+        // soma as posições do valor incial ao final
+        for(int j = i; j < max; j ++ )
+        {                
+            resultado += pesos[j];                
+        }        
+
         // start semaphore
-        xSemaphoreTake(mutual_exclusion_mutex, portMAX_DELAY);
-        printf("peso[%d] = %f\n", j, pesos[j]);
-        printf("peso total = %f\n", peso_total);
-        peso_total += pesos[j];
+        xSemaphoreTake(mutual_exclusion_mutex_soma, portMAX_DELAY);
+        peso_total += resultado;    // adiciona a soma total
+        xSemaphoreGive(mutual_exclusion_mutex_soma);
         // end mutex
-        xSemaphoreGive(mutual_exclusion_mutex);
-    }
+
+        // printf("Resultado task %d = %f\n", ID, resultado);
+
+        // deleta task atual
+        vTaskDelete(NULL);
+    }    
 }
 
 void soma_pesos()
 {
     // suspender as  tasks
     suspender_tasks();
-    // TODO: criar threads para realizar a soma paralelamente
-    // dividir entre os dois cores 50% pra cada
-    // mutex nas tasks para poder somar corretamente
-  
-    /*
-    xTaskCreatePinnedToCore(task1, "task_1", 2048, (int*)1, 3, &handler_task1, 0);
-    //configASSERT(handler_task1);
-    xTaskCreatePinnedToCore(task1, "task_2", 2048, (int*)2, 3, &handler_task2, 1);
-    //configASSERT(handler_task2);
-    */
-    for(int i = 0; i < NUM_MAX_PROD; i++){
-        peso_total += pesos[i];
-    }
+
+    // cria threads para realizar a soma paralelamente
+    // divide entre os dois cores 50% pra cada
+    // colocado mutex nas tasks para poder somar corretamente
+    xTaskCreatePinnedToCore(&soma_paralela, "soma_1", 2048, (int*)1, 4, &handler_task1, APP_CPU_NUM);
+    configASSERT(handler_task1);
+    xTaskCreatePinnedToCore(&soma_paralela, "soma_2", 2048, (int*)2, 4, &handler_task2, PRO_CPU_NUM);
+    configASSERT(handler_task2);
+    
+    // aguarda task1 finalizar
+    while(eTaskGetState(handler_task1) == eRunning)
+    {
+        vTaskDelay(1 / portTICK_RATE_MS); // pra liberar o core
+    } 
+
+    // aguarda task2 finalizar
+    while(eTaskGetState(handler_task2) == eRunning)
+    {
+        vTaskDelay(1 / portTICK_RATE_MS); // pra liberar o core
+    } 
 
     printf("Peso total = %f\n", peso_total);
-
-    //vTaskDelay(TEMPO_ATUALIZACAO / portTICK_RATE_MS);
-    //vTaskDelay(TEMPO_ATUALIZACAO / portTICK_RATE_MS);
-   
+       
     //zera o peso total
 	peso_total = 0;
 
@@ -208,8 +231,7 @@ void esteira_3(void *pvParameter)
 
  
 void display(void *pvParameter)
-{
-    
+{    
     while(1) 
     {
         vTaskDelay(TEMPO_ATUALIZACAO / portTICK_RATE_MS);
@@ -221,7 +243,8 @@ void display(void *pvParameter)
 // configura o touch
 static void tp_example_touch_pad_init(void)
 {
-    for (int i = 0;i< TOUCH_PAD_MAX;i++) {
+    for (int i = 0;i< TOUCH_PAD_MAX;i++) 
+    {
         touch_pad_config(i, TOUCH_THRESH_NO_USE);
     }
 }
@@ -230,14 +253,14 @@ static void tp_example_touch_pad_init(void)
 // função que le os valores dos pinos que acionam o touch
 static void tp_example_read_task(void *pvParameter)
 {
-    uint16_t touch_value;
-    uint16_t touch_filter_value;
+    uint16_t touch_value;    
 #if TOUCH_FILTER_MODE_EN
     printf("Touch Sensor filter mode read, the output format is: \nTouchpad num:[raw data, filtered data]\n\n");
 #else
     printf("Touch Sensor normal mode read, the output format is: \nTouchpad num:[raw data]\n\n");
 #endif
-    while (1) {
+    while (1) 
+    {
 
 #if TOUCH_FILTER_MODE_EN
             // If open the filter mode, please use this API to get the touch pad count.
@@ -246,7 +269,8 @@ static void tp_example_read_task(void *pvParameter)
             printf("T%d:[%4d,%4d] ", i, touch_value, touch_filter_value);
 #else
             touch_pad_read(0, &touch_value);
-            if(touch_value < 1000){
+            if(touch_value < 1000)
+            {
                 printf("Desligando\n");
                 printf("Reinicie para começar o programa novamente\n");
   
@@ -257,12 +281,12 @@ static void tp_example_read_task(void *pvParameter)
                 vTaskDelete(handler_touch);
             }
 #endif
-            if(touch_value < (uint16_t)100){
+            if(touch_value < (uint16_t)100)
+            {
                 printf("\nSistema de Emergência Acinado");
                 vTaskDelay(2000/portTICK_PERIOD_MS);
             }
-
-        printf("\n");
+        
         vTaskDelay(200 / portTICK_PERIOD_MS);
     }
 } 
@@ -273,11 +297,13 @@ void app_main()
 
     // inicializa semáforo
     mutual_exclusion_mutex = xSemaphoreCreateMutex();
+    mutual_exclusion_mutex_soma = xSemaphoreCreateMutex();
 
     // Inicializa o touch
     touch_pad_init();
 
-    if( mutual_exclusion_mutex == NULL ){
+    if( mutual_exclusion_mutex == NULL )
+    {
         printf("Erro na criação do mutex\n");
         exit(0);
     }
@@ -290,7 +316,7 @@ void app_main()
     #endif
 
     // Start task to read values sensed by pads
-    xTaskCreate(&tp_example_read_task, "touch_pad_read_task", 2048, NULL, 3, &handler_touch);
+    xTaskCreate(&tp_example_read_task, "touch_pad_read_task", 2048, NULL, 5, &handler_touch);
     configASSERT(handler_touch);
 
     xTaskCreate(&esteira_1, "esteira_1", 2048, NULL, 3, &handler_est1);
@@ -302,10 +328,7 @@ void app_main()
     xTaskCreate(&esteira_3, "esteira_3", 2048, NULL, 3, &handler_est3);
     configASSERT(handler_est2);
     
-    xTaskCreate(&display, "display", 2048, NULL, 3, &handler_display);
-    configASSERT(handler_display);
-    
-
-    // criar task para monitoramento do botão de parada
+    xTaskCreate(&display, "display", 2048, NULL, 1, &handler_display);
+    configASSERT(handler_display);        
 
 }
