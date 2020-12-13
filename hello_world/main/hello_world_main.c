@@ -19,6 +19,7 @@ Modificado em 02 de dezembro de 2020
 #include "nvs_flash.h"
 #include "driver/touch_pad.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 
 // NUM máximo de produto
 #define NUM_MAX_PROD 100
@@ -59,6 +60,9 @@ TaskHandle_t handler_task2;
 static int num_produtos = 0;
 static float pesos[NUM_MAX_PROD] = {0x0};
 float peso_total = 0;
+
+int64_t start_soma, end_soma;
+double total_time;
 
 void suspender_tasks ()
 {
@@ -104,13 +108,25 @@ void soma_pesos()
     // dividir entre os dois cores 50% pra cada
     // mutex nas tasks para poder somar corretamente
   
-
+    /*
     xTaskCreatePinnedToCore(task1, "task_1", 2048, (int*)1, 3, &handler_task1, 0);
-    configASSERT(handler_task1);
+    //configASSERT(handler_task1);
     xTaskCreatePinnedToCore(task1, "task_2", 2048, (int*)2, 3, &handler_task2, 1);
-    configASSERT(handler_task2);
+    //configASSERT(handler_task2);
+    */
+    for(int i = 0; i < NUM_MAX_PROD; i++){
+        peso_total += pesos[i];
+    }
+
+    printf("Peso total = %f\n", peso_total);
+
+    //vTaskDelay(TEMPO_ATUALIZACAO / portTICK_RATE_MS);
+    //vTaskDelay(TEMPO_ATUALIZACAO / portTICK_RATE_MS);
    
-	// resumir as tasks
+    //zera o peso total
+	peso_total = 0;
+
+    // resumir as tasks
     resumir_tasks();
 }
 
@@ -125,7 +141,12 @@ void soma_produto(float peso)
     if (num_produtos >= NUM_MAX_PROD)
     {
         // cria task de somar peso
+        start_soma = esp_timer_get_time();
         soma_pesos(); 
+        end_soma = esp_timer_get_time();
+        total_time = ((double) (end_soma - start_soma)) / 1000000;
+        printf("Tempo soma total: %f\n", total_time);
+
         num_produtos = 0;
     }
 
