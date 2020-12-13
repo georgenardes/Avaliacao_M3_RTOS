@@ -53,10 +53,12 @@ TaskHandle_t handler_est1;
 TaskHandle_t handler_est2;
 TaskHandle_t handler_est3;
 TaskHandle_t handler_touch;
+TaskHandle_t handler_task1;
+TaskHandle_t handler_task2;
 
 static int num_produtos = 0;
 static float pesos[NUM_MAX_PROD] = {0x0};
-
+float peso_total = 0;
 
 void suspender_tasks ()
 {
@@ -72,27 +74,44 @@ void resumir_tasks ()
     // inserir tasks para suspender aqui
 }
 
+void task1(int valor){
+
+    int max = 0, i = 0;
+
+    if(valor == 1){
+        i = 0;
+        max = 50;
+    }else{
+        i = 50;
+        max = 100;
+    }
+    for(int j = i; j < max; j ++ ){
+        // start semaphore
+        xSemaphoreTake(mutual_exclusion_mutex, portMAX_DELAY);
+        printf("peso[%d] = %f\n", j, pesos[j]);
+        printf("peso total = %f\n", peso_total);
+        peso_total += pesos[j];
+        // end mutex
+        xSemaphoreGive(mutual_exclusion_mutex);
+    }
+}
 
 void soma_pesos()
 {
     // suspender as  tasks
     suspender_tasks();
-
-    float peso_total = 0;
-    
     // TODO: criar threads para realizar a soma paralelamente
     // dividir entre os dois cores 50% pra cada
     // mutex nas tasks para poder somar corretamente
-    for(int i = 0; i < NUM_MAX_PROD; i++)
-    {
-        peso_total += pesos[i];
-    }
+  
 
-    printf("O peso total dos prodos foi %f \n", peso_total);        
-
-    // resumir as tasks
+    xTaskCreatePinnedToCore(task1, "task_1", 2048, (int*)1, 3, &handler_task1, 0);
+    configASSERT(handler_task1);
+    xTaskCreatePinnedToCore(task1, "task_2", 2048, (int*)2, 3, &handler_task2, 1);
+    configASSERT(handler_task2);
+   
+	// resumir as tasks
     resumir_tasks();
-	
 }
 
 void soma_produto(float peso)
@@ -262,7 +281,7 @@ void app_main()
     xTaskCreate(&esteira_3, "esteira_3", 2048, NULL, 3, &handler_est3);
     configASSERT(handler_est2);
     
-    xTaskCreate(&display, "display", 2048, NULL, 1, &handler_display);
+    xTaskCreate(&display, "display", 2048, NULL, 3, &handler_display);
     configASSERT(handler_display);
     
 
