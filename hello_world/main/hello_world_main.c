@@ -2,6 +2,7 @@
 Arquivo: monitoramento_esteiras.c
 Autor:  Diogo Marchi
         George Borba
+        Leonardo Grando
 Função do arquivo: 
         Cria threads para contagem, pesagem e exibição de
         produtos em 3 esteiras.
@@ -22,7 +23,7 @@ Modificado em 02 de dezembro de 2020
 #include "esp_timer.h"
 
 // NUM máximo de produto
-#define NUM_MAX_PROD 1500
+#define NUM_MAX_PROD 200
 
 // periodo milissegundos entre passagem de produtos nas esteiras 
 #define TEMPO_EST_1 1000
@@ -144,7 +145,7 @@ void soma_pesos()
         vTaskDelay(1 / portTICK_RATE_MS); // pra liberar o core
     } 
 
-    printf("Peso total = %f\n", peso_total);
+    printf("Peso total dos produtos = %f\n", peso_total);
        
     //zera o peso total
 	peso_total = 0;
@@ -163,14 +164,20 @@ void soma_produto(float peso)
 
     if (num_produtos >= NUM_MAX_PROD)
     {
-        // cria task de somar peso
-        start_soma = esp_timer_get_time();
+
+        // inicia soma de peso
         soma_pesos(); 
-        end_soma = esp_timer_get_time();
-        total_time = ((double) (end_soma - start_soma)) / 1000000;
-        printf("Tempo soma total: %f\n", total_time);
 
         num_produtos = 0;
+
+
+        // tempo final 
+        end_soma = esp_timer_get_time();
+
+        // tempo total 
+        total_time = ((double) (end_soma - start_soma)) / 1000000;
+
+        printf("Tempo consumido para realizar a soma dos produtos nas esteiras: %f\n", total_time);
     }
 
     // end mutex
@@ -273,7 +280,7 @@ static void tp_example_read_task(void *pvParameter)
             {
                 printf("Desligando\n");
                 printf("Reinicie para começar o programa novamente\n");
-  
+
                 vTaskDelete(handler_est1);
                 vTaskDelete(handler_est2);
                 vTaskDelete(handler_est3);
@@ -291,6 +298,14 @@ static void tp_example_read_task(void *pvParameter)
     }
 } 
  
+
+
+
+/*
+
+MAIN FUNCTION
+
+*/ 
 void app_main()
 {
     nvs_flash_init();
@@ -299,14 +314,21 @@ void app_main()
     mutual_exclusion_mutex = xSemaphoreCreateMutex();
     mutual_exclusion_mutex_soma = xSemaphoreCreateMutex();
 
-    // Inicializa o touch
-    touch_pad_init();
-
     if( mutual_exclusion_mutex == NULL )
     {
         printf("Erro na criação do mutex\n");
         exit(0);
     }
+    
+    if( mutual_exclusion_mutex_soma == NULL )
+    {
+        printf("Erro na criação do mutex\n");
+        exit(0);
+    }
+
+
+    // Inicializa o touch
+    touch_pad_init();
 
     // Configuração touch
     touch_pad_set_voltage(TOUCH_HVOLT_2V7, TOUCH_LVOLT_0V5, TOUCH_HVOLT_ATTEN_1V);
@@ -327,6 +349,9 @@ void app_main()
 
     xTaskCreate(&esteira_3, "esteira_3", 2048, NULL, 3, &handler_est3);
     configASSERT(handler_est2);
+
+    // tempo atual
+    start_soma = esp_timer_get_time();
     
     xTaskCreate(&display, "display", 2048, NULL, 1, &handler_display);
     configASSERT(handler_display);        
